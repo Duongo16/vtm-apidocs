@@ -107,7 +107,7 @@ public class DocumentServiceImpl implements DocumentService {
         if (doc.getPublishedAt() == null) doc.setPublishedAt(Instant.now());
         doc = docRepo.save(doc);
 
-        indexService.reindex(doc.getId(), openAPI);
+        //indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
 
@@ -166,7 +166,7 @@ public class DocumentServiceImpl implements DocumentService {
         var openAPI = parserService.parseOrThrow(normalized);
 
         ApiDocument doc = importJson(name, slug, version, description, normalized);
-        indexService.reindex(doc.getId(), openAPI);
+//        indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
 

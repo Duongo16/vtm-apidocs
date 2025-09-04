@@ -2,12 +2,13 @@ package com.example.vtm_apidocs_be.web;
 
 import com.example.vtm_apidocs_be.entity.ApiDocument;
 import com.example.vtm_apidocs_be.service.DocumentService;
+import com.example.vtm_apidocs_be.utils.LlmClient;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
@@ -18,6 +19,8 @@ import java.util.Map;
 public class ImportController {
 
     private final DocumentService documentService;
+    private final LlmClient llmClient;
+    private final ObjectMapper objectMapper;
 
     @PostMapping(value = "/import-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Map<String, Object> importPdf(
@@ -35,6 +38,41 @@ public class ImportController {
 
         var dto = documentService.getSpecForFrontend(doc.getId(), "1");
         return Map.of("documentId", doc.getId(), "status", "ok", "specText", dto.raw());
+    }
+
+
+    @PostMapping(
+            value = "/generate-openapi",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public ResponseEntity<?> generateOpenApi(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(defaultValue = "Untitled API") String title,
+            @RequestParam(defaultValue = "1.0.0") String version,
+            @RequestParam(required = false) String description
+    ) throws Exception {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Missing PDF file"));
+        }
+        // (tuỳ chọn) kiểm tra contentType
+        String ct = file.getContentType();
+        if (ct != null && !ct.toLowerCase().contains("pdf")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File must be a PDF"));
+        }
+
+        byte[] pdfBytes = file.getBytes();
+        String json = llmClient.generateOpenApiFromPdf(pdfBytes, title, version, description);
+
+        // Thử parse để trả về application/json
+        try {
+            Map<?, ?> parsed = objectMapper.readValue(json, Map.class);
+            return ResponseEntity.ok(parsed);
+        } catch (JsonProcessingException ex) {
+            // Nếu không parse được → trả raw để bạn xem lỗi
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(json);
+        }
     }
 }
 
