@@ -1,0 +1,121 @@
+/* 100% height layout + theme đỏ đồng bộ Scalar & MUI */
+
+/* Root page layout */
+.docs-root {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+
+  /* Overlay đỏ nhẹ */
+  background:
+    radial-gradient(1200px 600px at 10% 0%, rgba(211,47,47,0.12), transparent),
+    radial-gradient(1000px 500px at 90% -10%, rgba(163,21,21,0.12), transparent);
+}
+
+/* Toolbar bar (phần admin button) */
+:root {
+  --vtm-toolbar-bg: rgba(255,255,255,0.04);
+  --vtm-toolbar-border: rgba(255,255,255,0.08);
+
+  /* Scalar color tokens (best-effort) */
+  --scalar-color-1: #d32f2f;   /* primary */
+  --scalar-color-2: #a31515;   /* primaryDark */
+  --scalar-color-3: #e57373;   /* primaryLight */
+
+  /* Text & surface */
+  --scalar-background-1: #0f0f10; /* page bg */
+  --scalar-background-2: #171718; /* card bg */
+  --scalar-color-text-1: #f3f4f6;
+  --scalar-color-text-2: #9ca3af;
+
+  /* Accent for HTTP methods, fallback nếu Scalar đọc các var này */
+  --scalar-http-get: #4CAF50;
+  --scalar-http-post: #2196F3;
+  --scalar-http-put: #FF9800;
+  --scalar-http-delete: #F44336;
+  --scalar-http-patch: #FFC107;
+}
+
+/* Content split */
+.docs-content {
+  flex: 1;
+  min-height: 0; /* quan trọng để con có thể overflow:auto */
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+@media (min-width: 1024px) {
+  .docs-content.edit-enabled {
+    grid-template-columns: minmax(420px, 42%) 1fr;
+  }
+}
+
+/* Pane styles */
+.pane {
+  overflow: auto;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  min-height: 0;
+  position: relative;
+}
+
+.pane-editor, .pane-viewer {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Editor & Viewer host must fill */
+.scalar-editor-host,
+.scalar-viewer-host {
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Overlay và error trong editor pane */
+.pane-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(2px);
+  color: #fff; font-size: 14px;
+}
+.pane-error { padding: 12px; color: tomato; }
+
+/* Ép Scalar React full-size trong host */
+.scalar-viewer-host > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Một số class Scalar thường gặp (best-effort – an toàn) */
+.scalar-app, .scalar-api-reference, .api-reference, [data-theme] .app {
+  height: 100%;
+}
+
+/* Khi bật edit mode + admin, grid có 2 cột */
+.docs-content > .pane-editor + .pane-viewer,
+.docs-content > .pane-viewer:only-child {
+  /* no-op, giữ cấu trúc linh hoạt */
+}
+
+/* (Tùy chọn) scrollbar nhẹ */
+.pane::-webkit-scrollbar,
+.scalar-editor-host::-webkit-scrollbar,
+.scalar-viewer-host::-webkit-scrollbar {
+  width: 10px; height: 10px;
+}
+.pane::-webkit-scrollbar-thumb,
+.scalar-editor-host::-webkit-scrollbar-thumb,
+.scalar-viewer-host::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: rgba(255,255,255,0.25);
+}
