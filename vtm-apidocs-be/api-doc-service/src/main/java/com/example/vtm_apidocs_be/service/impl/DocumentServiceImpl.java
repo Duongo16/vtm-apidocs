@@ -99,25 +99,21 @@ public class DocumentServiceImpl implements DocumentService {
     public ApiDocument importJson(String name, String slug, String version, String description, String specJson, Long categoryId) {
         var openAPI = parserService.parseOrThrow(specJson);
 
-        ApiDocument doc = docRepo.findBySlug(slug).orElseGet(ApiDocument::new);
+        ApiDocument doc = new ApiDocument();
         doc.setName(name);
         doc.setSlug(slug);
         doc.setVersion(version);
         doc.setDescription(description);
         doc.setSpecJson(specJson);
 
-        // Gán category nếu có
-        if (categoryId != null) {
-            var cat = categoryRepo.findById(categoryId)
-                    .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
-            doc.setCategory(cat);
-        }
+        var cat = categoryRepo.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
+        doc.setCategory(cat);
 
         if (doc.getStatus() == null) doc.setStatus(ApiDocument.Status.draft);
         if (doc.getPublishedAt() == null) doc.setPublishedAt(Instant.now());
 
         doc = docRepo.save(doc);
-        indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
 
@@ -176,7 +172,6 @@ public class DocumentServiceImpl implements DocumentService {
         var openAPI = parserService.parseOrThrow(normalized);
 
         ApiDocument doc = importJson(name, slug, version, description, normalized, categoryId);
-//        indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
 

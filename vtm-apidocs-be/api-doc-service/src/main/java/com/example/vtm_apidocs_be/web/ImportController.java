@@ -27,7 +27,7 @@ public class ImportController {
                                          @RequestParam String slug,
                                          @RequestParam String version,
                                          @RequestParam(required = false) String description,
-                                         @RequestParam(required = false) Long categoryId,
+                                         @RequestParam Long categoryId,
                                          @RequestParam("file") MultipartFile file) throws Exception {
         String filename = (file.getOriginalFilename() == null ? "" : file.getOriginalFilename()).toLowerCase();
         if (!filename.endsWith(".pdf")) throw new IllegalArgumentException("Only PDF is accepted in this route");
