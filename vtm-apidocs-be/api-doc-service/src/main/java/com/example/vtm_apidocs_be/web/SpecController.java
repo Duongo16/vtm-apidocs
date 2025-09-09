@@ -36,7 +36,7 @@ public class SpecController {
                 .body(dto.raw());
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id}/spec")
     public Map<String, Object> updateSpec(@PathVariable Long id, @RequestBody String specText) {
         documentService.updateSpec(id, specText);
         return Map.of("documentId", id, "status", "ok", "updatedAt", Instant.now().toString());

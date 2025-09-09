@@ -23,7 +23,10 @@ import {
   TextField,
   Toolbar,
   Typography,
+  useTheme,
 } from "@mui/material";
+import { LoadingButton } from "@mui/lab";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Plus, Upload } from "lucide-react";
 import { ApiReferenceReact } from "@scalar/api-reference-react";
 import "@scalar/api-reference-react/style.css";
@@ -51,6 +54,8 @@ import {
 import { Save } from "lucide-react";
 import OpenJsonEditorCard from "../components/OpenJsonEditorCard";
 import { useToast } from "../context/ToastContext";
+import OpenApiDesigner from "../components/OpenApiDesigner";
+import { colors } from "../theme/colors";
 
 // --- helpers ---
 const isJson = (s: string) => {
@@ -352,12 +357,15 @@ export default function DocsDashboard() {
   // =====================
   // Preview configuration (live update)
   // =====================
+  const theme = useTheme();
+  const mode = theme.palette.mode;
+
   const apiRefConfig = useMemo(
     () => ({
       content: specStr,
       theme: "kepler",
       layout: "modern",
-      darkMode: true,
+      darkMode: mode === "dark",
       hideDarkModeToggle: false,
       showSidebar: true,
       hideSearch: false,
@@ -367,6 +375,71 @@ export default function DocsDashboard() {
       hiddenClients: ["wget"],
       metaData: { title: "VTM API Docs", description: "Internal API docs" },
       favicon: "/favicon.svg",
+      customCss: `
+      /* ===== Light mode ===== */
+      .light-mode {
+        /* text */
+        --scalar-color-1: ${colors.gray[900]};     /* primary text */
+        --scalar-color-2: ${colors.gray[600]};     /* secondary text */
+        --scalar-color-3: ${colors.gray[500]};     /* muted text */
+
+        /* accent / links / highlights */
+        --scalar-color-accent: ${colors.primary};
+        
+        /* backgrounds & borders */
+        --scalar-background-1: ${colors.gray[50]}; /* page bg */
+        --scalar-background-2: ${colors.white};    /* surfaces/cards */
+        --scalar-border-color: ${colors.gray[200]};
+
+        /* code blocks & chips */
+        --scalar-code-background-1: ${colors.gray[100]};
+        --scalar-code-color-1: ${colors.gray[900]};
+
+        /* buttons / interactive */
+        --scalar-button-primary: ${colors.primary};
+        --scalar-button-primary-hover: ${colors.primaryDark};
+        --scalar-button-primary-color: ${colors.white};
+        --scalar-badge-accent: ${colors.primaryLight};
+      }
+
+      /* ===== Dark mode ===== */
+      .dark-mode {
+        /* text */
+        --scalar-color-1: ${colors.gray[100]};
+        --scalar-color-2: ${colors.gray[400]};
+        --scalar-color-3: ${colors.gray[500]};
+
+        /* accent / links */
+        --scalar-color-accent: ${colors.primaryLight};
+
+        /* backgrounds & borders */
+        --scalar-background-1: #121212;
+        --scalar-background-2: #1e1e1e;
+        --scalar-border-color: ${colors.gray[700]};
+
+        /* code blocks */
+        --scalar-code-background-1: ${colors.gray[800]};
+        --scalar-code-color-1: ${colors.gray[50]};
+
+        /* buttons / interactive */
+        --scalar-button-primary: ${colors.primaryLight};
+        --scalar-button-primary-hover: ${colors.primary};
+        --scalar-button-primary-color: ${colors.white};
+        --scalar-badge-accent: ${colors.primaryLight};
+      }
+
+      /* (tuỳ chọn) nhấn mạnh link */
+      .light-mode a, .dark-mode a {
+        color: var(--scalar-color-accent);
+      }
+
+      /* (tuỳ chọn) sidebar tinh chỉnh nhẹ */
+      .light-mode .sidebar { --scalar-sidebar-color-2: ${colors.gray[600]}; }
+      .dark-mode .sidebar  { --scalar-sidebar-color-2: ${colors.gray[400]}; }
+
+      /* (tuỳ chọn) method labels – nếu Scalar của bạn dùng badge mặc định */
+      .light-mode .http-verb, .dark-mode .http-verb { color: #fff; }
+    `,
     }),
     [specStr]
   );
@@ -455,11 +528,9 @@ export default function DocsDashboard() {
     if (!activeId) return;
     try {
       setSavingSpec(true);
-      // đảm bảo JSON hợp lệ trước khi lưu
       const obj = JSON.parse(specText);
-      const payload = JSON.stringify(obj); // bạn có thể stringify kèm pretty nếu backend chấp nhận
+      const payload = JSON.stringify(obj);
       await updateSpec(activeId, payload);
-      // tuỳ logic: reindex ngay sau khi đổi spec
       await reindex(activeId);
       setSpecError(null);
       showSuccess("Saved spec & reindexed");
@@ -722,23 +793,6 @@ export default function DocsDashboard() {
             gridTemplateRows: "auto auto 1fr", // toolbar, tabs, main
           }}
         >
-          {/* Action Bar */}
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{
-              px: 1.5,
-              py: 1,
-              borderBottom: "1px solid var(--vtm-toolbar-border)",
-              alignItems: "center",
-              bgcolor: "background.paper",
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              {activeDoc ? activeDoc.name : "No document"}
-            </Typography>
-          </Stack>
-
           {/* Tabs */}
           <Tabs
             value={tab}
@@ -776,102 +830,9 @@ export default function DocsDashboard() {
                   alignItems="stretch"
                   sx={{ height: "100%" }}
                 >
-                  {/* LEFT: Metadata */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Card
-                      variant="outlined"
-                      sx={{
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                      }}
-                    >
-                      <CardHeader
-                        title="Details"
-                        subheader="Tên, slug, phiên bản, mô tả & trạng thái"
-                        sx={{
-                          pb: 1,
-                          "& .MuiCardHeader-subheader": { mt: 0.5 },
-                          borderBottom: (t) => `1px solid ${t.palette.divider}`,
-                          bgcolor: "background.paper",
-                        }}
-                      />
-                      <CardContent sx={{ display: "grid", gap: 2, py: 2 }}>
-                        <TextField
-                          label="Name"
-                          value={meta.name ?? ""}
-                          onChange={(e) =>
-                            setMeta((m) => ({ ...m, name: e.target.value }))
-                          }
-                          fullWidth
-                        />
-                        <TextField
-                          label="Slug"
-                          value={meta.slug ?? ""}
-                          onChange={(e) =>
-                            setMeta((m) => ({ ...m, slug: e.target.value }))
-                          }
-                          fullWidth
-                          helperText="Dùng chữ thường-kebab-case (vd: store-api)"
-                        />
-                        <TextField
-                          label="Version"
-                          value={meta.version ?? ""}
-                          onChange={(e) =>
-                            setMeta((m) => ({ ...m, version: e.target.value }))
-                          }
-                          fullWidth
-                        />
-                        <TextField
-                          label="Description"
-                          value={meta.description ?? ""}
-                          onChange={(e) =>
-                            setMeta((m) => ({
-                              ...m,
-                              description: e.target.value,
-                            }))
-                          }
-                          multiline
-                          minRows={4}
-                          fullWidth
-                        />
-                        <TextField
-                          select
-                          label="Status"
-                          value={(meta.status ?? "draft") as DocStatus}
-                          onChange={(e) =>
-                            doPublish(e.target.value as DocStatus)
-                          }
-                          disabled={!activeId}
-                          fullWidth
-                        >
-                          {["draft", "published", "archived"].map((s) => (
-                            <MenuItem key={s} value={s}>
-                              {s}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </CardContent>
-                      <CardActions
-                        sx={{ justifyContent: "flex-end", p: 2, pt: 0 }}
-                      >
-                        <Button
-                          startIcon={<Save size={16} />}
-                          variant="contained"
-                          onClick={doSaveMeta}
-                          disabled={!activeId || savingMeta}
-                        >
-                          {savingMeta ? "Saving..." : "Save Metadata"}
-                        </Button>
-                      </CardActions>
-                    </Card>
-                  </Grid>
-
-                  {/* RIGHT: OpenAPI JSON editor */}
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <OpenJsonEditorCard
-                      editorDark
-                      title="OpenAPI (JSON)"
+                  <Grid size={{ xs: 12 }}>
+                    <OpenApiDesigner
+                      title="OpenAPI Designer"
                       value={specText}
                       onChange={setSpecText}
                       onSave={handleSaveSpecFromMeta}
@@ -997,19 +958,24 @@ export default function DocsDashboard() {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setImportOpen(false)}>Hủy</Button>
-          <Button
+          <Button onClick={() => setImportOpen(false)} disabled={importing}>
+            Hủy
+          </Button>
+
+          <LoadingButton
             variant="contained"
             onClick={doImport}
+            loading={importing}
+            loadingPosition="start"
+            startIcon={<CloudUploadIcon />}
             disabled={
-              importing ||
               !importForm.name ||
               !importForm.slug ||
               (!importForm.file && !importForm.spec)
             }
           >
             Tạo / Import
-          </Button>
+          </LoadingButton>
         </DialogActions>
       </Dialog>
 

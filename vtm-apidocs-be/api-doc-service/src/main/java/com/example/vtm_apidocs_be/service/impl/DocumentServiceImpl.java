@@ -54,7 +54,7 @@ public class DocumentServiceImpl implements DocumentService {
         if (doc.getVersion() != null) doc.setVersion(doc.getVersion());
         if (doc.getDescription() != null) doc.setDescription(doc.getDescription());
         docRepo.save(doc);
-        indexService.reindex(doc.getId(), openAPI);
+        //indexService.reindex(doc.getId(), openAPI);
     }
 
     @Override
