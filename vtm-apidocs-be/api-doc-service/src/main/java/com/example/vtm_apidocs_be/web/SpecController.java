@@ -27,8 +27,6 @@ public class SpecController {
 
     private final DocumentService documentService;
 
-    // -------- Spec endpoints --------
-
     @GetMapping("/{id}/spec")
     public ResponseEntity<String> getSpec(@PathVariable Long id,
                                           @RequestParam(value = "frontend", required = false) String frontend) {
@@ -38,8 +36,6 @@ public class SpecController {
                 .body(dto.raw());
     }
 
-
-    /** Cập nhật spec */
     @PutMapping("/{id}")
     public Map<String, Object> updateSpec(@PathVariable Long id, @RequestBody String specText) {
         documentService.updateSpec(id, specText);
@@ -87,10 +83,18 @@ public class SpecController {
                                           @RequestParam String name,
                                           @RequestParam String slug,
                                           @RequestParam(defaultValue = "1.0.0") String version,
-                                          @RequestParam(required = false) String description) {
-        ApiDocument doc = documentService.importJson(name, slug, version, description, specJson);
-        return Map.of("documentId", doc.getId(), "slug", doc.getSlug(), "version", doc.getVersion(), "status", doc.getStatus().name());
+                                          @RequestParam(required = false) String description,
+                                          @RequestParam(required = false) Long categoryId) {
+        ApiDocument doc = documentService.importJson(name, slug, version, description, specJson, categoryId);
+        return Map.of(
+                "documentId", doc.getId(),
+                "slug", doc.getSlug(),
+                "version", doc.getVersion(),
+                "status", doc.getStatus().name(),
+                "categoryId", doc.getCategory() != null ? doc.getCategory().getId() : null // optional
+        );
     }
+
 
     // -------- Document management --------
 

@@ -39,7 +39,6 @@ import {
   publish,
   reindex,
   removeDoc,
-  importSpec,
   type DocStatus,
 } from "../services/adminDocsService";
 import {
@@ -48,10 +47,10 @@ import {
   CardHeader,
   CardContent,
   CardActions,
-  LinearProgress,
 } from "@mui/material";
 import { Save } from "lucide-react";
 import OpenJsonEditorCard from "../components/OpenJsonEditorCard";
+import { useToast } from "../context/ToastContext";
 
 // --- helpers ---
 const isJson = (s: string) => {
@@ -93,11 +92,33 @@ function normalizeSpecForEditor(raw: string): string {
 }
 
 export default function DocsDashboard() {
+  // ---- Type ------
+  type Category = {
+    id: number;
+    name: string;
+    slug: string;
+    sortOrder?: number;
+  };
+
+  type ImportForm = {
+    name: string;
+    slug: string;
+    version: string;
+    description: string;
+    spec: string;
+    file: File | null;
+    categoryId: number | null;
+  };
+
+  const { showSuccess, showError } = useToast();
+
+  const [refreshTick, setRefreshTick] = useState(0);
+
   // --- Auth / Derived ---
   const { user } = useAuth();
   const isAdmin = (user?.role || "").toLowerCase().includes("admin");
   const searchParams = new URLSearchParams(window.location.search);
-  const selectParam = searchParams.get("select"); // <-- ?select=<id>
+  const selectParam = searchParams.get("select");
 
   // =====================
   // Sidebar state
@@ -106,6 +127,7 @@ export default function DocsDashboard() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DocStatus | "all">("all");
   const [loadingList, setLoadingList] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // =====================
   // Selection
@@ -153,19 +175,54 @@ export default function DocsDashboard() {
   // Import dialog
   // =====================
   const [importOpen, setImportOpen] = useState(false);
-  const [importForm, setImportForm] = useState({
+  const [importForm, setImportForm] = useState<ImportForm>({
     name: "",
     slug: "",
     version: "1.0.0",
     description: "",
     spec: "",
+    file: null,
+    categoryId: null,
   });
+  const [importing, setImporting] = useState(false);
 
   const empty = !loadingList && docs.length === 0;
 
   // =====================
+  // Guards
+  // =====================
+  if (!isAdmin) {
+    return (
+      <Box p={3}>
+        <Navbar
+          sidebarOpen={false}
+          setSidebarOpen={() => {}}
+          searchQuery=""
+          setSearchQuery={() => {}}
+        />
+        <Alert severity="error" sx={{ mt: 2 }}>
+          Bạn không có quyền truy cập Dashboard. Liên hệ quản trị viên.
+        </Alert>
+      </Box>
+    );
+  }
+
+  // =====================
   // Effects
   // =====================
+  // 0) Load list categories
+  useEffect(() => {
+    if (!importOpen) return;
+    (async () => {
+      try {
+        const res = await fetch("/admin/categories");
+        const data: Category[] = await res.json();
+        setCategories(data);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [importOpen]);
 
   // 1) Load list (mỗi lần query/statusFilter/selectParam đổi)
   useEffect(() => {
@@ -208,7 +265,7 @@ export default function DocsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [query, statusFilter, selectParam]); // thêm selectParam để bắt thay đổi URL/param
+  }, [query, statusFilter, selectParam, refreshTick]); // thêm selectParam để bắt thay đổi URL/param
 
   // 2) Load spec khi activeId thay đổi (chỉ phụ thuộc activeId)
   useEffect(() => {
@@ -405,7 +462,7 @@ export default function DocsDashboard() {
       // tuỳ logic: reindex ngay sau khi đổi spec
       await reindex(activeId);
       setSpecError(null);
-      // nếu bạn có toast: toast.success("Saved spec & reindexed");
+      showSuccess("Saved spec & reindexed");
     } catch (e: any) {
       setSpecError(String(e.message || e));
     } finally {
@@ -424,14 +481,92 @@ export default function DocsDashboard() {
   };
 
   const doImport = async () => {
+    if (importing) return;
+
+    const name = (importForm.name || "").trim();
+    const slug = (importForm.slug || "").trim();
+    const version = (importForm.version || "").trim() || "1.0.0";
+    const description = (importForm.description || "").trim();
+    const spec = importForm.spec || "";
+    const file = importForm.file || null;
+    const categoryId = importForm.categoryId ?? null;
+
+    // --- basic validation ---
+    if (!name || !slug || (!file && !spec.trim())) {
+      showError("Vui lòng điền Name, Slug và chọn PDF hoặc dán Spec");
+      return;
+    }
+
+    // --- timeout (ví dụ 120s) ---
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
+
     try {
-      const res = await importSpec({
-        name: importForm.name,
-        slug: importForm.slug,
-        version: importForm.version,
-        description: importForm.description,
-        spec: importForm.spec,
+      setImporting(true);
+
+      // ===== PDF (multipart) =====
+      if (file) {
+        const form = new FormData();
+        form.append("name", name);
+        form.append("slug", slug);
+        form.append("version", version);
+        if (description) form.append("description", description);
+        if (categoryId != null) form.append("categoryId", String(categoryId));
+        form.append("file", file);
+
+        const res = await fetch(`/admin/docs/import-pdf`, {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+        });
+
+        const raw = await res.text();
+        if (!res.ok) {
+          throw new Error(
+            `Import PDF failed: ${res.status} ${res.statusText} — ${raw.slice(
+              0,
+              500
+            )}`
+          );
+        }
+
+        setImportOpen(false);
+        setImportForm({
+          name: "",
+          slug: "",
+          version: "1.0.0",
+          description: "",
+          spec: "",
+          file: null,
+          categoryId: null,
+        });
+        showSuccess("Import PDF thành công");
+        setRefreshTick((t) => t + 1);
+        return;
+      }
+
+      // ===== SPEC (JSON/YAML) =====
+      const params = new URLSearchParams({ name, slug, version });
+      if (description) params.append("description", description);
+      if (categoryId != null) params.append("categoryId", String(categoryId));
+
+      const res = await fetch(`/admin/docs/import?` + params.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "text/plain; charset=UTF-8" },
+        body: spec,
+        signal: controller.signal,
       });
+
+      const raw = await res.text();
+      if (!res.ok) {
+        throw new Error(
+          `Import spec failed: ${res.status} ${res.statusText} — ${raw.slice(
+            0,
+            500
+          )}`
+        );
+      }
+
       setImportOpen(false);
       setImportForm({
         name: "",
@@ -439,45 +574,22 @@ export default function DocsDashboard() {
         version: "1.0.0",
         description: "",
         spec: "",
+        file: null,
+        categoryId: null,
       });
-      // reload giữ filters hiện tại
-      const list = await listDocuments(
-        query || undefined,
-        statusFilter === "all" ? undefined : statusFilter
-      );
-      const sorted = [...list].sort((a, b) =>
-        (b.updatedAt || "").localeCompare(a.updatedAt || "")
-      );
-      setDocs(sorted);
-      setActiveId(res.documentId);
-      setSnack({ open: true, msg: "Đã import spec.", sev: "success" });
-    } catch (e: any) {
-      setSnack({
-        open: true,
-        msg: `Import lỗi: ${e?.message ?? e}`,
-        sev: "error",
-      });
+      showSuccess("Import spec thành công");
+      setRefreshTick((t) => t + 1);
+    } catch (err: any) {
+      const msg =
+        err?.name === "AbortError"
+          ? "Import bị hủy do quá thời gian (timeout). Hãy thử lại."
+          : err?.message || "Import thất bại";
+      showError(msg);
+    } finally {
+      clearTimeout(timeoutId);
+      setImporting(false);
     }
   };
-
-  // =====================
-  // Guards
-  // =====================
-  if (!isAdmin) {
-    return (
-      <Box p={3}>
-        <Navbar
-          sidebarOpen={false}
-          setSidebarOpen={() => {}}
-          searchQuery=""
-          setSearchQuery={() => {}}
-        />
-        <Alert severity="error" sx={{ mt: 2 }}>
-          Bạn không có quyền truy cập Dashboard. Liên hệ quản trị viên.
-        </Alert>
-      </Box>
-    );
-  }
 
   return (
     <Box
@@ -820,6 +932,18 @@ export default function DocsDashboard() {
               }
             />
           </Stack>
+          <Autocomplete
+            size="small"
+            options={categories}
+            getOptionLabel={(o) => o.name}
+            value={
+              categories.find((c) => c.id === importForm.categoryId) ?? null
+            }
+            onChange={(_, opt) =>
+              setImportForm((f) => ({ ...f, categoryId: opt?.id ?? null }))
+            }
+            renderInput={(p) => <TextField {...p} label="Category" />}
+          />
           <Stack direction="row" spacing={2} alignItems="center">
             <Button component="label" startIcon={<Upload />}>
               Import PDF (AI)
@@ -827,44 +951,36 @@ export default function DocsDashboard() {
                 hidden
                 type="file"
                 accept=".pdf"
-                onChange={async (e) => {
+                onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
-                  try {
-                    const form = new FormData();
-                    form.append(
-                      "name",
-                      activeDoc?.name ?? f.name.replace(/\.pdf$/i, "")
-                    );
-                    form.append(
-                      "slug",
-                      activeDoc?.slug ??
-                        f.name
-                          .replace(/\.pdf$/i, "")
-                          .toLowerCase()
-                          .replace(/\s+/g, "-")
-                    );
-                    form.append("version", activeDoc?.version ?? "1.0.0");
-                    form.append("description", activeDoc?.description ?? "");
-                    form.append("file", f);
-
-                    const res = await fetch(`/admin/docs/import-pdf`, {
-                      method: "POST",
-                      body: form,
-                    });
-                    if (!res.ok)
-                      throw new Error(`Import failed: ${res.status}`);
-                    const data = await res.json();
-                    setImportForm((fr) => ({ ...fr, spec: data.specText }));
-                  } catch (err) {
-                    console.error(err);
-                  } finally {
-                    e.currentTarget.value = "";
-                  }
+                  setImportForm((fr) => {
+                    const base = f.name.replace(/\.pdf$/i, "");
+                    return {
+                      ...fr,
+                      file: f,
+                      // auto-fill nếu trống
+                      name: fr.name || base,
+                      slug: fr.slug || base.toLowerCase().replace(/\s+/g, "-"),
+                    };
+                  });
+                  // Cho phép chọn lại cùng 1 file sau này
+                  e.currentTarget.value = "";
                 }}
               />
             </Button>
-
+            {importForm.file ? (
+              <Chip
+                size="small"
+                sx={{ ml: 1 }}
+                label={`${importForm.file.name} (${(
+                  importForm.file.size /
+                  1024 /
+                  1024
+                ).toFixed(2)} MB)`}
+                onDelete={() => setImportForm((fr) => ({ ...fr, file: null }))}
+              />
+            ) : null}
             <Typography variant="body2" sx={{ opacity: 0.8 }}>
               Hoặc dán spec vào ô phía dưới (JSON/YAML).
             </Typography>
@@ -877,6 +993,7 @@ export default function DocsDashboard() {
             onChange={(e) =>
               setImportForm((f) => ({ ...f, spec: e.target.value }))
             }
+            disabled={!!importForm.file}
           />
         </DialogContent>
         <DialogActions>
@@ -884,7 +1001,12 @@ export default function DocsDashboard() {
           <Button
             variant="contained"
             onClick={doImport}
-            disabled={!importForm.name || !importForm.slug || !importForm.spec}
+            disabled={
+              importing ||
+              !importForm.name ||
+              !importForm.slug ||
+              (!importForm.file && !importForm.spec)
+            }
           >
             Tạo / Import
           </Button>

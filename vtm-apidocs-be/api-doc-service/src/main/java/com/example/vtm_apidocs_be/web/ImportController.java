@@ -23,22 +23,22 @@ public class ImportController {
     private final ObjectMapper objectMapper;
 
     @PostMapping(value = "/import-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Map<String, Object> importPdf(
-            @RequestParam String name,
-            @RequestParam String slug,
-            @RequestParam String version,
-            @RequestParam(required = false) String description,
-            @RequestParam("file") MultipartFile file
-    ) throws Exception {
+    public Map<String, Object> importPdf(@RequestParam String name,
+                                         @RequestParam String slug,
+                                         @RequestParam String version,
+                                         @RequestParam(required = false) String description,
+                                         @RequestParam(required = false) Long categoryId,
+                                         @RequestParam("file") MultipartFile file) throws Exception {
         String filename = (file.getOriginalFilename() == null ? "" : file.getOriginalFilename()).toLowerCase();
-        if (!filename.endsWith(".pdf")) {
-            throw new IllegalArgumentException("Only PDF is accepted in this route");
-        }
-        ApiDocument doc = documentService.importPdf(name, slug, version, description, file.getBytes());
+        if (!filename.endsWith(".pdf")) throw new IllegalArgumentException("Only PDF is accepted in this route");
+
+        ApiDocument doc = documentService.importPdf(name, slug, version, description, categoryId, file.getBytes());
 
         var dto = documentService.getSpecForFrontend(doc.getId(), "1");
-        return Map.of("documentId", doc.getId(), "status", "ok", "specText", dto.raw());
+        return Map.of("documentId", doc.getId(), "status", "ok", "specText", dto.raw(),
+                "categoryId", doc.getCategory() != null ? doc.getCategory().getId() : null);
     }
+
 
 
     @PostMapping(
@@ -54,7 +54,6 @@ public class ImportController {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing PDF file"));
         }
-        // (tuỳ chọn) kiểm tra contentType
         String ct = file.getContentType();
         if (ct != null && !ct.toLowerCase().contains("pdf")) {
             return ResponseEntity.badRequest().body(Map.of("error", "File must be a PDF"));
@@ -63,12 +62,10 @@ public class ImportController {
         byte[] pdfBytes = file.getBytes();
         String json = llmClient.generateOpenApiFromPdf(pdfBytes, title, version, description);
 
-        // Thử parse để trả về application/json
         try {
             Map<?, ?> parsed = objectMapper.readValue(json, Map.class);
             return ResponseEntity.ok(parsed);
         } catch (JsonProcessingException ex) {
-            // Nếu không parse được → trả raw để bạn xem lỗi
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(json);

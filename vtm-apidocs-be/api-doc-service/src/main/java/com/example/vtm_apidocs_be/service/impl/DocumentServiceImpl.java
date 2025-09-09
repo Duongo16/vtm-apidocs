@@ -3,11 +3,11 @@ package com.example.vtm_apidocs_be.service.impl;
 import com.example.vtm_apidocs_be.entity.ApiDocument;
 import com.example.vtm_apidocs_be.entity.ApiEndpointIndex;
 import com.example.vtm_apidocs_be.repo.DocumentRepository;
+import com.example.vtm_apidocs_be.repo.CategoryRepository;
 import com.example.vtm_apidocs_be.repo.EndpointIndexRepository;
 import com.example.vtm_apidocs_be.service.DocumentService;
 import com.example.vtm_apidocs_be.service.EndpointIndexService;
 import com.example.vtm_apidocs_be.service.SpecParserService;
-import com.example.vtm_apidocs_be.utils.DocTextExtractor;
 import com.example.vtm_apidocs_be.utils.LlmClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +24,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository docRepo;
     private final EndpointIndexRepository epRepo;
+    private final CategoryRepository categoryRepo;
     private final SpecParserService parserService;
     private final EndpointIndexService indexService;
     private final LlmClient llmClient;
@@ -95,19 +96,28 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     @Transactional
-    public ApiDocument importJson(String name, String slug, String version, String description, String specJson) {
+    public ApiDocument importJson(String name, String slug, String version, String description, String specJson, Long categoryId) {
         var openAPI = parserService.parseOrThrow(specJson);
+
         ApiDocument doc = docRepo.findBySlug(slug).orElseGet(ApiDocument::new);
         doc.setName(name);
         doc.setSlug(slug);
         doc.setVersion(version);
         doc.setDescription(description);
         doc.setSpecJson(specJson);
+
+        // Gán category nếu có
+        if (categoryId != null) {
+            var cat = categoryRepo.findById(categoryId)
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
+            doc.setCategory(cat);
+        }
+
         if (doc.getStatus() == null) doc.setStatus(ApiDocument.Status.draft);
         if (doc.getPublishedAt() == null) doc.setPublishedAt(Instant.now());
-        doc = docRepo.save(doc);
 
-        //indexService.reindex(doc.getId(), openAPI);
+        doc = docRepo.save(doc);
+        indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
 
@@ -158,14 +168,14 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public ApiDocument importPdf(String name, String slug, String version, String description, byte[] pdfBytes) {
+    public ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes) {
         // Gọi LLM đọc PDF → trả về OpenAPI JSON
         String draftJson = llmClient.generateOpenApiFromPdf(pdfBytes, name, version, description);
 
         String normalized = normalizeOpenApiJson(draftJson);
         var openAPI = parserService.parseOrThrow(normalized);
 
-        ApiDocument doc = importJson(name, slug, version, description, normalized);
+        ApiDocument doc = importJson(name, slug, version, description, normalized, categoryId);
 //        indexService.reindex(doc.getId(), openAPI);
         return doc;
     }
@@ -175,7 +185,7 @@ public class DocumentServiceImpl implements DocumentService {
         if (j.startsWith("```")) {
             j = j.replaceFirst("^```[a-zA-Z]*", "").replaceAll("```\\s*$", "").trim();
         }
-        j = j.replace("\\/","/").replace("u002f","/").replace("\\u002f","/");
+        j = j.replace("\\/", "/").replace("u002f", "/").replace("\\u002f", "/");
         int s = j.indexOf('{'), e = j.lastIndexOf('}');
         if (s >= 0 && e > s) j = j.substring(s, e + 1);
         return j;
