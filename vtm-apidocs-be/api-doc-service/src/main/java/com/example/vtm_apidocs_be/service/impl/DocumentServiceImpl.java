@@ -47,14 +47,9 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional
     public void updateSpec(Long docId, String specText) {
-        var openAPI = parserService.parseOrThrow(specText);
         ApiDocument doc = docRepo.findById(docId).orElseThrow();
-        if (doc.getName() != null) doc.setName(doc.getName());
-        if (doc.getSlug() != null) doc.setSlug(doc.getSlug());
-        if (doc.getVersion() != null) doc.setVersion(doc.getVersion());
-        if (doc.getDescription() != null) doc.setDescription(doc.getDescription());
-        docRepo.save(doc);
-        //indexService.reindex(doc.getId(), openAPI);
+        doc.setSpecJson(specText);
+        docRepo.saveAndFlush(doc);
     }
 
     @Override

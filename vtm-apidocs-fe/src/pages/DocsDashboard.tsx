@@ -546,8 +546,10 @@ export default function DocsDashboard() {
       JSON.parse(specText || "{}");
       setSpecStr(specText);
       doSaveSpec();
+      showSuccess("Update thành công!");
     } catch (e: any) {
       setSpecError(e?.message || String(e));
+      showError("Spec không hợp lệ, vui lòng kiểm tra lại.");
     }
   };
 

@@ -7,7 +7,6 @@ import {
   Card,
   CardActions,
   CardContent,
-  CardHeader,
   IconButton,
   List,
   ListItemButton,
@@ -19,11 +18,13 @@ import {
   Typography,
   Chip,
   Paper,
-  Avatar,
   Fade,
   Tooltip,
   useTheme,
   alpha,
+  MenuItem,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -34,10 +35,6 @@ import InfoIcon from "@mui/icons-material/Info";
 import StorageIcon from "@mui/icons-material/Storage";
 import LabelIcon from "@mui/icons-material/Label";
 import HttpIcon from "@mui/icons-material/Http";
-
-// If you have Scalar viewer installed, uncomment and use Preview tab below
-// import "@scalar/api-reference-react/style.css";
-// import { ApiReference } from "@scalar/api-reference-react";
 
 // ---------- Types & helpers ----------
 const HTTP_METHODS = [
@@ -160,7 +157,6 @@ export default function OpenApiDesigner({
   disabled,
   loading,
   errorMessage,
-  title = "OpenAPI Designer",
 }: Props) {
   const theme = useTheme();
   const parsed = useMemo(
@@ -168,6 +164,7 @@ export default function OpenApiDesigner({
     [value]
   );
   const [tab, setTab] = useState(0);
+  const [detailTab, setDetailTab] = useState<"body" | "responses">("body");
 
   // local selection for endpoints
   const operations = useMemo(() => listOperations(parsed), [parsed]);
@@ -584,73 +581,177 @@ export default function OpenApiDesigner({
                     },
                   }}
                 />
+                <TextField
+                  label="Operation ID"
+                  value={selected.op?.operationId ?? ""}
+                  onChange={(e) =>
+                    upsertSelected({ operationId: e.target.value })
+                  }
+                  fullWidth
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                    },
+                  }}
+                />
+                <TextField
+                  select
+                  label="Tags"
+                  value={selected.op?.tags?.[0] ?? ""}
+                  onChange={(e) => {
+                    const tag = e.target.value;
+                    upsertSelected({ tags: tag ? [tag] : [] });
+                  }}
+                  fullWidth
+                  SelectProps={{
+                    native: true,
+                  }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                    },
+                  }}
+                >
+                  <option value="">None</option>
+                  {(parsed.tags ?? []).map((t: { name: string }) => (
+                    <option key={t.name} value={t.name}>
+                      {t.name}
+                    </option>
+                  ))}
+                </TextField>
               </Stack>
 
-              <TextField
-                label="Summary"
-                value={selected.op?.summary ?? ""}
-                onChange={(e) => upsertSelected({ summary: e.target.value })}
-                fullWidth
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
-                }}
-              />
-              <TextField
-                label="Description"
-                value={selected.op?.description ?? ""}
-                onChange={(e) =>
-                  upsertSelected({ description: e.target.value })
-                }
-                fullWidth
-                minRows={4}
-                multiline
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
-                }}
-              />
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                sx={{ width: "100%" }}
+              >
+                <TextField
+                  label="Summary"
+                  value={selected.op?.summary ?? ""}
+                  onChange={(e) => upsertSelected({ summary: e.target.value })}
+                  fullWidth
+                  minRows={3}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                    },
+                  }}
+                />
+                <TextField
+                  label="Description"
+                  value={selected.op?.description ?? ""}
+                  onChange={(e) =>
+                    upsertSelected({ description: e.target.value })
+                  }
+                  fullWidth
+                  minRows={3}
+                  multiline
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                    },
+                  }}
+                />
+              </Stack>
 
-              <TextField
-                label="Operation ID"
-                value={selected.op?.operationId ?? ""}
-                onChange={(e) =>
-                  upsertSelected({ operationId: e.target.value })
-                }
-                fullWidth
+              <Card
+                variant="outlined"
                 sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
+                  borderRadius: 2,
+                  width: "100%",
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
                 }}
-              />
+              >
+                <CardContent
+                  sx={{
+                    pt: 0,
+                    p: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    maxHeight: { xs: 220, md: 330 }, // đặt chiều cao tối đa của card
+                    overflow: "hidden", // ẩn tràn, phần nội dung dưới sẽ tự cuộn
+                  }}
+                >
+                  {/* Navbar (Tabs) để chuyển giữa Schema và Responses */}
+                  <Tabs
+                    value={detailTab}
+                    onChange={(_, v) => setDetailTab(v)}
+                    variant="fullWidth"
+                    sx={{
+                      minHeight: 36,
+                      "& .MuiTab-root": {
+                        textTransform: "none",
+                        minHeight: 36,
+                        fontWeight: 600,
+                      },
+                      "& .MuiTabs-indicator": { height: 2 },
+                      mb: 2,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <Tab value="body" label="Request Body (JSON Schema)" />
+                    <Tab value="responses" label="Responses" />
+                  </Tabs>
 
-              <TextField
-                label="Tags (comma separated)"
-                value={(selected.op?.tags ?? []).join(", ")}
-                onChange={(e) => {
-                  const tags = e.target.value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  upsertSelected({ tags });
-                }}
-                fullWidth
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 2,
-                  },
-                }}
-              />
+                  {/* Tab panels */}
+                  <Box
+                    role="tabpanel"
+                    hidden={detailTab !== "body"}
+                    sx={{
+                      flex: 1,
+                      overflowY: "auto",
+                      px: 2,
+                      pb: 2,
+                      pr: 1, // chừa chỗ cho scrollbar
+                      "&::-webkit-scrollbar": { width: 8 },
+                      "&::-webkit-scrollbar-thumb": (theme) => ({
+                        backgroundColor: alpha(
+                          theme.palette.text.primary,
+                          0.24
+                        ),
+                        borderRadius: 8,
+                      }),
+                    }}
+                  >
+                    {detailTab === "body" && (
+                      <SchemaEditor
+                        schema={
+                          selected.op?.requestBody?.content?.[
+                            "application/json"
+                          ]?.schema || {
+                            type: "object",
+                            properties: {},
+                          }
+                        }
+                        onChange={(schema) => {
+                          upsertSelected({
+                            requestBody: {
+                              required: true,
+                              content: {
+                                "application/json": {
+                                  schema,
+                                },
+                              },
+                            },
+                          });
+                        }}
+                        disabled={disabled}
+                      />
+                    )}
+                  </Box>
 
-              {/* Responses (simple) */}
-              <ResponsesEditor
-                responses={selected.op?.responses ?? {}}
-                onChange={(responses) => upsertSelected({ responses })}
-                disabled={!!disabled}
-              />
+                  <Box role="tabpanel" hidden={detailTab !== "responses"}>
+                    {detailTab === "responses" && (
+                      <ResponsesEditor
+                        responses={selected.op?.responses ?? {}}
+                        onChange={(responses) => upsertSelected({ responses })}
+                        disabled={!!disabled}
+                      />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
 
               <Stack
                 direction={{ xs: "column", sm: "row" }}
@@ -768,13 +869,6 @@ export default function OpenApiDesigner({
       </Box>
     </Fade>
   );
-
-  // Optional: Scalar Preview tab
-  // const PreviewTab = (
-  //   <Box sx={{ height: 560, overflow: "auto" }}>
-  //     <ApiReference configuration={{ spec: { content: value } }} />
-  //   </Box>
-  // );
 
   return (
     <Card
@@ -1132,29 +1226,11 @@ function ResponsesEditor({
         border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
       }}
     >
-      <CardHeader
-        avatar={
-          <Avatar
-            sx={{ bgcolor: theme.palette.success.main, width: 32, height: 32 }}
-          >
-            <Typography variant="caption" fontWeight={600}>
-              R
-            </Typography>
-          </Avatar>
-        }
-        title={
-          <Typography variant="subtitle1" fontWeight={600}>
-            Response Definitions
-          </Typography>
-        }
-        subheader="Define the possible responses for this endpoint"
-        sx={{ pb: 1 }}
-      />
       <CardContent
         sx={{
           width: "100%",
-          maxHeight: "300px", // Added max height for responses section
-          overflow: "auto", // Enable scrolling for responses
+          maxHeight: "220px",
+          overflow: "auto",
           "&::-webkit-scrollbar": {
             width: "8px",
           },
@@ -1249,6 +1325,272 @@ function ResponsesEditor({
             }}
           >
             Add Response
+          </Button>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SchemaEditor({
+  schema,
+  onChange,
+  disabled,
+  title,
+}: {
+  schema: any;
+  onChange: (schema: any) => void;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const theme = useTheme();
+
+  const safeSchema = schema ?? {};
+  const safePropsObj: Record<string, any> = safeSchema.properties ?? {};
+  const safeRequired: string[] = Array.isArray(safeSchema.required)
+    ? safeSchema.required
+    : [];
+
+  const [properties, setProperties] = useState<Array<[string, any]>>(
+    Object.entries(safePropsObj)
+  );
+
+  useEffect(() => {
+    // khi parent cập nhật schema -> sync lại local state
+    setProperties(Object.entries(schema?.properties ?? {}));
+  }, [schema]);
+
+  const toPropsObj = (pairs: Array<[string, any]>): Record<string, any> =>
+    pairs.reduce((acc, [k, v]) => {
+      acc[k] = v;
+      return acc;
+    }, {} as Record<string, any>);
+
+  const uniqueName = (
+    base: string,
+    pairs: Array<[string, any]>,
+    ignoreIndex: number | null = null
+  ): string => {
+    const exist = new Set(
+      pairs
+        .map(([n], i) => (ignoreIndex !== null && i === ignoreIndex ? null : n))
+        .filter(Boolean) as string[]
+    );
+    if (!exist.has(base)) return base;
+    let i = 2;
+    while (exist.has(`${base}${i}`)) i++;
+    return `${base}${i}`;
+  };
+
+  const emit = (
+    nextPairs: Array<[string, any]>,
+    nextRequired: string[] | undefined = safeRequired
+  ) => {
+    setProperties(nextPairs);
+    const propsObj = toPropsObj(nextPairs);
+
+    const normalizedRequired =
+      nextRequired && nextRequired.length ? nextRequired : undefined;
+
+    onChange({
+      ...safeSchema,
+      type: "object",
+      properties: propsObj,
+      required: normalizedRequired,
+    });
+  };
+
+  const addProperty = () => {
+    const name = uniqueName(`property`, properties);
+    const next = [...properties, [name, { type: "string", description: "" }]];
+    emit(
+      next.filter((item) => Array.isArray(item) && item.length === 2) as [
+        string,
+        any
+      ][],
+      safeRequired
+    );
+  };
+
+  return (
+    <Card variant="outlined" sx={{ borderRadius: 2, width: "100%" }}>
+      <CardContent>
+        <Stack spacing={2}>
+          {title && (
+            <Typography variant="subtitle1" fontWeight={500}>
+              {title}
+            </Typography>
+          )}
+
+          {properties.map(([name, prop], idx) => {
+            const onRename = (newRaw: string) => {
+              const newName =
+                newRaw.trim() === name
+                  ? name
+                  : uniqueName(newRaw.trim() || "property", properties, idx);
+
+              if (newName === name) return;
+
+              const nextPairs = [...properties];
+              nextPairs[idx] = [newName, prop];
+
+              // cập nhật required nếu có tên cũ
+              const reqSet = new Set<string>(safeRequired);
+              if (reqSet.has(name)) {
+                reqSet.delete(name);
+                reqSet.add(newName);
+              }
+              emit(nextPairs, Array.from(reqSet));
+            };
+
+            const onTypeChange = (newType: string) => {
+              const nextPairs = [...properties];
+
+              let nextProp = { ...prop, type: newType };
+              if (newType === "array" && !nextProp.items) {
+                nextProp.items = { type: "string" };
+              }
+              if (newType !== "array" && nextProp.items) {
+                const { items, ...rest } = nextProp;
+                nextProp = rest;
+              }
+
+              nextPairs[idx] = [name, nextProp];
+              emit(nextPairs, safeRequired);
+            };
+
+            const onDescChange = (desc: string) => {
+              const nextPairs = [...properties];
+              nextPairs[idx] = [name, { ...prop, description: desc }];
+              emit(nextPairs, safeRequired);
+            };
+
+            const onToggleRequired = (checked: boolean) => {
+              const reqSet = new Set<string>(safeRequired);
+              if (checked) reqSet.add(name);
+              else reqSet.delete(name);
+              emit(properties, Array.from(reqSet));
+            };
+
+            const onDelete = () => {
+              const nextPairs = properties.filter((_, i) => i !== idx);
+              const reqSet = new Set<string>(safeRequired);
+              reqSet.delete(name);
+              emit(nextPairs, Array.from(reqSet));
+            };
+
+            return (
+              <Paper
+                key={`${name}-${idx}`}
+                elevation={0}
+                sx={{
+                  p: 2,
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1.5,
+                }}
+              >
+                <Stack spacing={2}>
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      label="Property Name"
+                      value={name}
+                      onChange={(e) => onRename(e.target.value)}
+                      disabled={disabled}
+                      sx={{ flex: 2 }}
+                    />
+
+                    <TextField
+                      select
+                      label="Type"
+                      value={prop.type || "string"}
+                      onChange={(e) => onTypeChange(e.target.value)}
+                      disabled={disabled}
+                      sx={{ flex: 1 }}
+                    >
+                      {[
+                        "string",
+                        "number",
+                        "integer",
+                        "boolean",
+                        "array",
+                        "object",
+                      ].map((type) => (
+                        <MenuItem key={type} value={type}>
+                          {type}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    {/* Gợi ý: nếu type=array, có thể mở thêm editor cho items */}
+                    {prop.type === "array" && (
+                      <TextField
+                        label="Array Item Type"
+                        select
+                        value={prop.items?.type ?? "string"}
+                        onChange={(e) => {
+                          const nextPairs = [...properties];
+                          nextPairs[idx] = [
+                            name,
+                            { ...prop, items: { type: e.target.value } },
+                          ];
+                          emit(nextPairs, safeRequired);
+                        }}
+                        disabled={disabled}
+                      >
+                        {[
+                          "string",
+                          "number",
+                          "integer",
+                          "boolean",
+                          "object",
+                          "array",
+                        ].map((t) => (
+                          <MenuItem key={t} value={t}>
+                            {t}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    )}
+
+                    <TextField
+                      label="Description"
+                      value={prop.description || ""}
+                      onChange={(e) => onDescChange(e.target.value)}
+                      disabled={disabled}
+                      multiline
+                      sx={{ width: "50%" }}
+                    />
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={safeRequired.includes(name)}
+                          onChange={(e) => onToggleRequired(e.target.checked)}
+                          disabled={disabled}
+                        />
+                      }
+                      label="Required"
+                    />
+
+                    <IconButton
+                      color="error"
+                      onClick={onDelete}
+                      disabled={disabled}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+              </Paper>
+            );
+          })}
+
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addProperty}
+            disabled={disabled}
+            variant="outlined"
+            sx={{ alignSelf: "flex-start" }}
+          >
+            Add Property
           </Button>
         </Stack>
       </CardContent>
