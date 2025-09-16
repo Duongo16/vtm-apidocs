@@ -21,6 +21,8 @@ import {
   Tab,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Typography,
   useTheme,
@@ -44,15 +46,7 @@ import {
   removeDoc,
   type DocStatus,
 } from "../services/adminDocsService";
-import {
-  Grid,
-  Card,
-  CardHeader,
-  CardContent,
-  CardActions,
-} from "@mui/material";
-import { Save } from "lucide-react";
-import OpenJsonEditorCard from "../components/OpenJsonEditorCard";
+import { Grid } from "@mui/material";
 import { useToast } from "../context/ToastContext";
 import OpenApiDesigner from "../components/OpenApiDesigner";
 import { colors } from "../theme/colors";
@@ -113,7 +107,10 @@ export default function DocsDashboard() {
     spec: string;
     file: File | null;
     categoryId: number | null;
+    provider: LlmProviderType;
   };
+
+  type LlmProviderType = "OPENROUTER" | "OPENAI" | "GEMINI";
 
   const { showSuccess, showError } = useToast();
 
@@ -188,6 +185,7 @@ export default function DocsDashboard() {
     spec: "",
     file: null,
     categoryId: null,
+    provider: "OPENROUTER",
   });
   const [importing, setImporting] = useState(false);
 
@@ -586,6 +584,7 @@ export default function DocsDashboard() {
         if (description) form.append("description", description);
         if (categoryId != null) form.append("categoryId", String(categoryId));
         form.append("file", file);
+        form.append("provider", importForm.provider);
 
         const res = await fetch(`/admin/docs/import-pdf`, {
           method: "POST",
@@ -612,6 +611,7 @@ export default function DocsDashboard() {
           spec: "",
           file: null,
           categoryId: null,
+          provider: "OPENROUTER",
         });
         showSuccess("Import PDF thành công");
         setRefreshTick((t) => t + 1);
@@ -649,6 +649,7 @@ export default function DocsDashboard() {
         spec: "",
         file: null,
         categoryId: null,
+        provider: "OPENROUTER",
       });
       showSuccess("Import spec thành công");
       setRefreshTick((t) => t + 1);
@@ -907,6 +908,27 @@ export default function DocsDashboard() {
             }
             renderInput={(p) => <TextField {...p} label="Category" />}
           />
+          <Stack direction="row" spacing={2}>
+            <TextField
+              select
+              label="LLM Provider"
+              fullWidth
+              size="small"
+              value={importForm.provider}
+              onChange={(e) =>
+                setImportForm((f) => ({
+                  ...f,
+                  provider: e.target.value as LlmProviderType,
+                }))
+              }
+              helperText="Chọn nhà cung cấp AI để phân tích PDF"
+            >
+              <MenuItem value="OPENROUTER">OpenRouter</MenuItem>
+              <MenuItem value="OPENAI">OpenAI</MenuItem>
+              <MenuItem value="GEMINI">Gemini</MenuItem>
+            </TextField>
+          </Stack>
+
           <Stack direction="row" spacing={2} alignItems="center">
             <Button component="label" startIcon={<Upload />}>
               Import PDF (AI)

@@ -1,6 +1,7 @@
 package com.example.vtm_apidocs_be.web;
 
 import com.example.vtm_apidocs_be.entity.ApiDocument;
+import com.example.vtm_apidocs_be.entity.LlmProviderType;
 import com.example.vtm_apidocs_be.service.DocumentService;
 import com.example.vtm_apidocs_be.utils.LlmClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -28,16 +29,25 @@ public class ImportController {
                                          @RequestParam String version,
                                          @RequestParam(required = false) String description,
                                          @RequestParam Long categoryId,
-                                         @RequestParam("file") MultipartFile file) throws Exception {
+                                         @RequestParam("file") MultipartFile file,
+                                         @RequestParam("provider") LlmProviderType provider) throws Exception {
         String filename = (file.getOriginalFilename() == null ? "" : file.getOriginalFilename()).toLowerCase();
         if (!filename.endsWith(".pdf")) throw new IllegalArgumentException("Only PDF is accepted in this route");
 
-        ApiDocument doc = documentService.importPdf(name, slug, version, description, categoryId, file.getBytes());
+        // dùng provider do FE gửi lên
+        ApiDocument doc = documentService.importPdf(
+                name, slug, version, description, categoryId, file.getBytes(), provider
+        );
 
         var dto = documentService.getSpecForFrontend(doc.getId(), "1");
-        return Map.of("documentId", doc.getId(), "status", "ok", "specText", dto.raw(),
-                "categoryId", doc.getCategory() != null ? doc.getCategory().getId() : null);
+        return Map.of(
+                "documentId", doc.getId(),
+                "status", "ok",
+                "specText", dto.raw(),
+                "categoryId", doc.getCategory() != null ? doc.getCategory().getId() : null
+        );
     }
+
 
 
 

@@ -1,7 +1,9 @@
 package com.example.vtm_apidocs_be.service.impl;
 
+import com.example.vtm_apidocs_be.dto.LlmGenerateRequest;
 import com.example.vtm_apidocs_be.entity.ApiDocument;
 import com.example.vtm_apidocs_be.entity.ApiEndpointIndex;
+import com.example.vtm_apidocs_be.entity.LlmProviderType;
 import com.example.vtm_apidocs_be.repo.DocumentRepository;
 import com.example.vtm_apidocs_be.repo.CategoryRepository;
 import com.example.vtm_apidocs_be.repo.EndpointIndexRepository;
@@ -9,7 +11,9 @@ import com.example.vtm_apidocs_be.service.DocumentService;
 import com.example.vtm_apidocs_be.service.EndpointIndexService;
 import com.example.vtm_apidocs_be.service.SpecParserService;
 import com.example.vtm_apidocs_be.utils.LlmClient;
+import com.example.vtm_apidocs_be.utils.LlmService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+
+import static org.apache.commons.lang3.StringUtils.firstNonBlank;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final SpecParserService parserService;
     private final EndpointIndexService indexService;
     private final LlmClient llmClient;
+    private final LlmService llmService;
 
     @Override
     @Transactional(readOnly = true)
@@ -170,6 +177,45 @@ public class DocumentServiceImpl implements DocumentService {
         return doc;
     }
 
+    @Override
+    public ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes, LlmProviderType provider) {
+
+        var requestBuilder = LlmGenerateRequest.builder()
+                .provider(provider)
+                .pdfBytes(pdfBytes)
+                .title(name)
+                .version(version)
+                .description(description);
+
+        switch (provider) {
+            case OPENROUTER -> {
+                requestBuilder
+                        .apiUrl(firstNonBlank(openRouterApiUrl, "https://openrouter.ai/api/v1/chat/completions"))
+                        .model(firstNonBlank(openRouterModel, "meta-llama/llama-3.1-70b-instruct:free"))
+                        .apiKey(required(openRouterApiKey, "OpenRouter API key (llm.api.key) is required"));
+            }
+            case OPENAI -> {
+                requestBuilder
+                        .apiUrl(firstNonBlank(openAiApiUrl, "https://api.openai.com/v1/chat/completions"))
+                        .model(required(openAiModel, "OpenAI model (openai.model) is required"))
+                        .apiKey(required(openAiApiKey, "OpenAI API key (openai.api.key) is required"));
+            }
+            case GEMINI -> {
+                requestBuilder
+                        .model(firstNonBlank(geminiModel, "gemini-1.5-flash"))
+                        .apiKey(required(geminiApiKey, "Gemini API key (gemini.api.key) is required"));
+            }
+        }
+
+        String draftJson = llmService.generateOpenApiFromPdf(requestBuilder.build());
+
+        String normalized = normalizeOpenApiJson(draftJson);
+        var openAPI = parserService.parseOrThrow(normalized);
+
+        ApiDocument doc = importJson(name, slug, version, description, normalized, categoryId);
+        return doc;
+    }
+
     private String normalizeOpenApiJson(String json) {
         String j = json == null ? "" : json.trim();
         if (j.startsWith("```")) {
@@ -179,6 +225,39 @@ public class DocumentServiceImpl implements DocumentService {
         int s = j.indexOf('{'), e = j.lastIndexOf('}');
         if (s >= 0 && e > s) j = j.substring(s, e + 1);
         return j;
+    }
+
+    @Value("${llm.api.url:https://openrouter.ai/api/v1/chat/completions}")
+    private String openRouterApiUrl;
+
+    @Value("${llm.api.key:}")
+    private String openRouterApiKey;
+
+    @Value("${llm.model:meta-llama/llama-3.1-70b-instruct:free}")
+    private String openRouterModel;
+
+    @Value("${openai.api.url:https://api.openai.com/v1/chat/completions}")
+    private String openAiApiUrl;
+
+    @Value("${openai.api.key:}")
+    private String openAiApiKey;
+
+    @Value("${openai.model:gpt-4o-mini}")
+    private String openAiModel;
+
+    @Value("${gemini.api.key:}")
+    private String geminiApiKey;
+
+    @Value("${gemini.model:gemini-1.5-flash}")
+    private String geminiModel;
+
+    private static String firstNonBlank(String a, String fallback) {
+        return (a != null && !a.isBlank()) ? a : fallback;
+    }
+
+    private static String required(String v, String msgIfMissing) {
+        if (v == null || v.isBlank()) throw new IllegalStateException(msgIfMissing);
+        return v;
     }
 
 }

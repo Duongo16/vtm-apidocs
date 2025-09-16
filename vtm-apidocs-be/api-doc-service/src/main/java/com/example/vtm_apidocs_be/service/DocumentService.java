@@ -2,6 +2,7 @@ package com.example.vtm_apidocs_be.service;
 
 import com.example.vtm_apidocs_be.entity.ApiDocument;
 import com.example.vtm_apidocs_be.entity.ApiEndpointIndex;
+import com.example.vtm_apidocs_be.entity.LlmProviderType;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -20,4 +21,6 @@ public interface DocumentService {
     ApiDocument updateMeta(Long id, String name, String slug, String version, String description);
     void deleteDocument(Long id);
     ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes);
+    ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes, LlmProviderType provider);
+
 }
