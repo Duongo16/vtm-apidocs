@@ -20,7 +20,6 @@ public interface DocumentService {
     List<ApiDocument> listDocuments(String q, String status);
     ApiDocument updateMeta(Long id, String name, String slug, String version, String description);
     void deleteDocument(Long id);
-    ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes);
     ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes, LlmProviderType provider);
 
 }

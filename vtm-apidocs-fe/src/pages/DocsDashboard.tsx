@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
@@ -24,11 +25,18 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Toolbar,
+  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import SearchIcon from "@mui/icons-material/Search";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import RestoreIcon from "@mui/icons-material/Restore";
+import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { Plus, Upload } from "lucide-react";
 import { ApiReferenceReact } from "@scalar/api-reference-react";
 import "@scalar/api-reference-react/style.css";
@@ -59,6 +67,28 @@ const isJson = (s: string) => {
   } catch {
     return false;
   }
+};
+
+function formatDateTime(input?: string | null) {
+  if (!input) return "";
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return input ?? "";
+  return date.toLocaleString("vi-VN", { hour12: false });
+}
+
+const statusLabels: Record<DocStatus, string> = {
+  draft: "Draft",
+  published: "Published",
+  archived: "Archived",
+};
+
+const statusChipColors: Record<
+  DocStatus,
+  "default" | "success" | "warning" | "info"
+> = {
+  draft: "warning",
+  published: "success",
+  archived: "info",
 };
 
 function normalizeSpecForEditor(raw: string): string {
@@ -190,6 +220,23 @@ export default function DocsDashboard() {
   const [importing, setImporting] = useState(false);
 
   const empty = !loadingList && docs.length === 0;
+
+  const statusOptions = useMemo<
+    Array<{ value: DocStatus | "all"; label: string }>
+  >(
+    () => [
+      { value: "all", label: "All statuses" },
+      { value: "draft", label: statusLabels.draft },
+      { value: "published", label: statusLabels.published },
+      { value: "archived", label: statusLabels.archived },
+    ],
+    []
+  );
+
+  const activeDocUpdatedAt = useMemo(
+    () => (activeDoc?.updatedAt ? formatDateTime(activeDoc.updatedAt) : ""),
+    [activeDoc?.updatedAt]
+  );
 
   // =====================
   // Guards
@@ -694,26 +741,96 @@ export default function DocsDashboard() {
             flexDirection: "column",
           }}
         >
-          <Toolbar sx={{ gap: 1 }}>
+          <Toolbar
+            sx={{
+              gap: 1,
+              borderBottom: "1px solid var(--vtm-toolbar-border)",
+              py: 1.5,
+              px: 2,
+              bgcolor: "rgba(148, 163, 184, 0.08)",
+              backdropFilter: "blur(6px)",
+            }}
+          >
             <TextField
               size="small"
               fullWidth
               placeholder="Search documents..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon
+                      sx={{ fontSize: 18, color: "text.secondary" }}
+                    />
+                  </InputAdornment>
+                ),
+              }}
             />
           </Toolbar>
-          <Box sx={{ px: 2, pb: 1 }}>
+          <Box
+            sx={{
+              px: 2,
+              py: 1.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                fontWeight: 600,
+                letterSpacing: 0.6,
+                textTransform: "uppercase",
+              }}
+            >
+              Documents
+            </Typography>
+            <Chip size="small" label={docs.length} variant="outlined" />
+          </Box>
+          <Box sx={{ px: 2, pb: 1.5 }}>
             <Autocomplete
               size="small"
-              options={["all", "draft", "published", "archived"]}
-              value={statusFilter}
-              onChange={(_, v) => setStatusFilter((v as any) ?? "all")}
-              renderInput={(p) => <TextField {...p} label="Status" />}
+              options={statusOptions}
+              value={
+                statusOptions.find((opt) => opt.value === statusFilter) ??
+                statusOptions[0]
+              }
+              onChange={(_, opt) => setStatusFilter(opt?.value ?? "all")}
+              getOptionLabel={(opt) => opt.label}
+              isOptionEqualToValue={(opt, value) => opt.value === value.value}
+              renderOption={(props, option) => (
+                <Box
+                  component="li"
+                  {...props}
+                  key={option.value}
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
+                  {option.value === "all" ? (
+                    <Chip size="small" label="All" variant="outlined" />
+                  ) : (
+                    <Chip
+                      size="small"
+                      label={statusLabels[option.value as DocStatus]}
+                      color={statusChipColors[option.value as DocStatus]}
+                      variant="outlined"
+                    />
+                  )}
+                  <Typography variant="body2">{option.label}</Typography>
+                </Box>
+              )}
+              renderInput={(params) => <TextField {...params} label="Status" />}
             />
           </Box>
 
-          <Box sx={{ px: 2, pb: 1, display: "flex", gap: 1 }}>
+          <Box
+            sx={{
+              px: 2,
+              pb: 1.5,
+              display: "flex",
+            }}
+          >
             <Button
               variant="contained"
               size="small"
@@ -726,6 +843,18 @@ export default function DocsDashboard() {
                 }));
               }}
               fullWidth
+              sx={{
+                py: 1.1,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 600,
+                background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`,
+                boxShadow: "0 12px 24px rgba(15,23,42,0.18)",
+                "&:hover": {
+                  background: `linear-gradient(135deg, ${colors.primaryDark} 0%, ${colors.primary} 100%)`,
+                  boxShadow: "0 16px 30px rgba(15,23,42,0.22)",
+                },
+              }}
             >
               New / Import
             </Button>
@@ -750,38 +879,106 @@ export default function DocsDashboard() {
             )}
 
             {!loadingList && !empty && (
-              <List dense disablePadding>
-                {docs.map((d) => (
-                  <ListItemButton
-                    key={d.id}
-                    selected={d.id === activeId}
-                    onClick={() => setActiveId(d.id)}
-                    sx={{ alignItems: "flex-start", py: 1.2 }}
-                  >
-                    <Box sx={{ mr: 1, mt: 0.2 }}>
-                      <Avatar sx={{ width: 28, height: 28 }}>
+              <List
+                dense
+                disablePadding
+                sx={{
+                  px: 2,
+                  pb: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                }}
+              >
+                {docs.map((d) => {
+                  const isActive = d.id === activeId;
+                  return (
+                    <ListItemButton
+                      key={d.id}
+                      selected={isActive}
+                      onClick={() => setActiveId(d.id)}
+                      sx={{
+                        alignItems: "flex-start",
+                        borderRadius: 2,
+                        px: 1.5,
+                        py: 1.4,
+                        gap: 1.5,
+                        border: "1px solid",
+                        borderColor: isActive ? colors.primary : "transparent",
+                        backgroundColor: isActive
+                          ? "action.selected"
+                          : "transparent",
+                        transition: "all 0.2s ease",
+                        boxShadow: isActive
+                          ? "0 12px 30px rgba(15,23,42,0.12)"
+                          : "none",
+                        "&:hover": {
+                          backgroundColor: "action.hover",
+                          transform: "translateX(4px)",
+                        },
+                        "& .MuiAvatar-root": {
+                          bgcolor: colors.primaryLight,
+                          color: colors.primaryDark,
+                        },
+                      }}
+                    >
+                      <Avatar sx={{ width: 32, height: 32, fontSize: 14 }}>
                         {(d.name || "D")[0].toUpperCase()}
                       </Avatar>
-                    </Box>
-                    <ListItemText
-                      primary={
-                        <Stack direction="row" alignItems="center" gap={1}>
-                          <span style={{ fontWeight: 600 }}>{d.name}</span>
-                          <Chip
-                            size="small"
-                            label={d.status}
-                            variant="outlined"
-                          />
-                        </Stack>
-                      }
-                      secondary={
-                        <span style={{ fontSize: 12, opacity: 0.8 }}>
-                          {d.slug} · v{d.version}
-                        </span>
-                      }
-                    />
-                  </ListItemButton>
-                ))}
+                      <ListItemText
+                        primary={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                          >
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ fontWeight: 600 }}
+                            >
+                              {d.name}
+                            </Typography>
+                            <Chip
+                              size="small"
+                              label={statusLabels[d.status]}
+                              color={statusChipColors[d.status]}
+                              variant={
+                                d.status === "draft" ? "outlined" : "filled"
+                              }
+                            />
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label={`v${d.version || "-"}`}
+                            />
+                          </Stack>
+                        }
+                        secondary={
+                          <Stack
+                            direction="row"
+                            spacing={1.5}
+                            alignItems="center"
+                            sx={{ mt: 0.5, color: "text.secondary" }}
+                          >
+                            <Typography variant="caption">{d.slug}</Typography>
+                            {d.updatedAt ? (
+                              <Stack
+                                direction="row"
+                                spacing={0.5}
+                                alignItems="center"
+                              >
+                                <AccessTimeIcon sx={{ fontSize: 14 }} />
+                                <Typography variant="caption">
+                                  {formatDateTime(d.updatedAt)}
+                                </Typography>
+                              </Stack>
+                            ) : null}
+                          </Stack>
+                        }
+                      />
+                    </ListItemButton>
+                  );
+                })}
               </List>
             )}
           </Box>
@@ -796,24 +993,198 @@ export default function DocsDashboard() {
             gridTemplateRows: "auto auto 1fr", // toolbar, tabs, main
           }}
         >
+          <Toolbar
+            sx={{
+              gap: 2,
+              flexWrap: "wrap",
+              alignItems: "center",
+              borderBottom: "1px solid var(--vtm-toolbar-border)",
+              px: 2,
+              py: 1.5,
+              position: "sticky",
+              top: 0,
+              zIndex: 9,
+              bgcolor: "background.paper",
+              boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+            }}
+          >
+            <Stack
+              direction="row"
+              gap={1.5}
+              sx={{ flexWrap: "wrap", alignItems: "center", flex: 1 }}
+            >
+              <TextField
+                label="Name"
+                size="small"
+                value={meta.name ?? ""}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, name: e.target.value }))
+                }
+                disabled={!activeId}
+                sx={{ minWidth: 220, flex: 1 }}
+              />
+              <TextField
+                label="Slug"
+                size="small"
+                value={meta.slug ?? ""}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, slug: e.target.value }))
+                }
+                disabled={!activeId}
+                sx={{ minWidth: 180 }}
+              />
+              <TextField
+                label="Version"
+                size="small"
+                value={meta.version ?? ""}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, version: e.target.value }))
+                }
+                disabled={!activeId}
+                sx={{ width: 130 }}
+              />
+              <TextField
+                label="Description"
+                size="small"
+                value={meta.description ?? ""}
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, description: e.target.value }))
+                }
+                disabled={!activeId}
+                sx={{ flex: 1.4, minWidth: 260 }}
+              />
+            </Stack>
+            <Stack
+              direction="row"
+              gap={1}
+              sx={{
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "flex-end",
+              }}
+            >
+              <ToggleButtonGroup
+                value={meta.status ?? null}
+                exclusive
+                size="small"
+                onChange={(_, value) => {
+                  if (!value || value === meta.status) return;
+                  void doPublish(value as DocStatus);
+                }}
+                disabled={!activeId || changingStatus}
+                sx={{
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none",
+                    fontWeight: 600,
+                    px: 1.6,
+                  },
+                }}
+              >
+                <ToggleButton value="draft">Draft</ToggleButton>
+                <ToggleButton value="published">Published</ToggleButton>
+                <ToggleButton value="archived">Archived</ToggleButton>
+              </ToggleButtonGroup>
+              <Tooltip title="Restore spec to original state">
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={doDiscard}
+                    disabled={!dirty || !activeId}
+                    startIcon={<RestoreIcon fontSize="small" />}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Restore
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title="Save document metadata">
+                <span>
+                  <LoadingButton
+                    variant="contained"
+                    size="small"
+                    onClick={doSaveMeta}
+                    loading={savingMeta}
+                    loadingPosition="start"
+                    startIcon={<SaveOutlinedIcon fontSize="small" />}
+                    disabled={!activeId}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Save metadata
+                  </LoadingButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Delete document">
+                <span>
+                  <Button
+                    color="error"
+                    size="small"
+                    onClick={doDelete}
+                    disabled={!activeId}
+                    startIcon={<DeleteOutlineIcon fontSize="small" />}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Delete
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+          </Toolbar>
           {/* Tabs */}
           <Tabs
             value={tab}
             onChange={(_, v) => setTab(v)}
             variant="scrollable"
-            sx={{ borderBottom: "1px solid var(--vtm-toolbar-border)" }}
+            sx={{
+              borderBottom: "1px solid var(--vtm-toolbar-border)",
+              px: 2,
+              bgcolor: "background.paper",
+            }}
+            TabIndicatorProps={{
+              sx: {
+                height: 3,
+                borderRadius: 1.5,
+                backgroundColor: colors.primary,
+              },
+            }}
           >
-            <Tab label="Preview" />
-            <Tab label="Editor" />
+            <Tab
+              label="Preview"
+              sx={{
+                textTransform: "none",
+                fontWeight: 500,
+                "&.Mui-selected": { fontWeight: 700, color: colors.primary },
+              }}
+            />
+            <Tab
+              label="Editor"
+              sx={{
+                textTransform: "none",
+                fontWeight: 500,
+                "&.Mui-selected": { fontWeight: 700, color: colors.primary },
+              }}
+            />
           </Tabs>
 
           {/* Panels */}
           <Box
-            sx={{ overflow: "hidden" /* quan trọng để tránh double-scroll */ }}
+            sx={{
+              overflow: "hidden",
+              bgcolor: "background.default",
+            }}
           >
             {/* Preview */}
             {tab === 0 && (
-              <Box sx={{ height: "100%", overflow: "auto", p: 1 }}>
+              <Box
+                sx={{
+                  height: "100%",
+                  overflow: "auto",
+                  p: 2,
+                  bgcolor: "background.paper",
+                  borderRadius: 2,
+                  boxShadow: "0 12px 32px rgba(15,23,42,0.08)",
+                }}
+              >
                 {activeId ? (
                   <ApiReferenceReact configuration={apiRefConfig as any} />
                 ) : (
@@ -826,7 +1197,14 @@ export default function DocsDashboard() {
 
             {/* Editor */}
             {tab === 1 && (
-              <Box sx={{ p: 2, height: "100%", overflow: "hidden" }}>
+              <Box
+                sx={{
+                  p: 2,
+                  height: "100%",
+                  overflow: "auto",
+                  bgcolor: "background.default",
+                }}
+              >
                 <Grid
                   container
                   spacing={2}
@@ -834,15 +1212,25 @@ export default function DocsDashboard() {
                   sx={{ height: "100%" }}
                 >
                   <Grid size={{ xs: 12 }}>
-                    <OpenApiDesigner
-                      title="OpenAPI Designer"
-                      value={specText}
-                      onChange={setSpecText}
-                      onSave={handleSaveSpecFromMeta}
-                      loading={specLoading}
-                      disabled={!activeId || specLoading}
-                      errorMessage={specError}
-                    />
+                    <Box
+                      sx={{
+                        height: "100%",
+                        bgcolor: "background.paper",
+                        borderRadius: 2,
+                        boxShadow: "0 20px 45px rgba(15,23,42,0.08)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <OpenApiDesigner
+                        title="OpenAPI Designer"
+                        value={specText}
+                        onChange={setSpecText}
+                        onSave={handleSaveSpecFromMeta}
+                        loading={specLoading || savingSpec}
+                        disabled={!activeId || specLoading || savingSpec}
+                        errorMessage={specError}
+                      />
+                    </Box>
                   </Grid>
                 </Grid>
               </Box>

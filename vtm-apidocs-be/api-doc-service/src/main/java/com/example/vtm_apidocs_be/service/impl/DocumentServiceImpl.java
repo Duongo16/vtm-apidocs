@@ -166,18 +166,6 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    public ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes) {
-        // Gọi LLM đọc PDF → trả về OpenAPI JSON
-        String draftJson = llmClient.generateOpenApiFromPdf(pdfBytes, name, version, description);
-
-        String normalized = normalizeOpenApiJson(draftJson);
-        var openAPI = parserService.parseOrThrow(normalized);
-
-        ApiDocument doc = importJson(name, slug, version, description, normalized, categoryId);
-        return doc;
-    }
-
-    @Override
     public ApiDocument importPdf(String name, String slug, String version, String description, Long categoryId, byte[] pdfBytes, LlmProviderType provider) {
 
         var requestBuilder = LlmGenerateRequest.builder()
