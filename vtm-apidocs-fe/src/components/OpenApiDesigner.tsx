@@ -14,6 +14,7 @@ import {
   Stack,
   Tab,
   Tabs,
+  ToggleButton,
   TextField,
   Typography,
   Chip,
@@ -35,6 +36,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import StorageIcon from "@mui/icons-material/Storage";
 import LabelIcon from "@mui/icons-material/Label";
 import HttpIcon from "@mui/icons-material/Http";
+import RichTextEditor from "./RichTextEditor";
 
 // ---------- Types & helpers ----------
 const HTTP_METHODS = [
@@ -276,21 +278,49 @@ export default function OpenApiDesigner({
               },
             }}
           />
-          <TextField
-            label="Description"
-            value={parsed.info?.description ?? ""}
-            onChange={(e) => handleInfoChange("description", e.target.value)}
-            fullWidth
-            minRows={4}
-            multiline
-            variant="outlined"
+          <Box
             sx={{
               width: "100%",
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2,
-              },
+              display: "flex",
+              flexDirection: "column",
+              gap: 0.5,
             }}
-          />
+          >
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              Description
+            </Typography>
+            <Box
+              sx={{
+                width: "100%",
+                "& .sun-editor": {
+                  borderRadius: 1,
+                  borderColor: "divider",
+                  boxShadow: "none",
+                },
+                "& .se-toolbar": {
+                  borderTopLeftRadius: 4,
+                  borderTopRightRadius: 4,
+                },
+                "& .se-toolbar, & .se-container": {
+                  borderColor: "divider",
+                },
+                "& .se-container": {
+                  borderBottomLeftRadius: 4,
+                  borderBottomRightRadius: 4,
+                },
+                "& .se-resizing-inner, & .se-container .se-wrapper": {
+                  fontFamily: "inherit",
+                },
+              }}
+            >
+              <RichTextEditor
+                value={parsed.info?.description ?? ""}
+                onChange={(next) => handleInfoChange("description", next)}
+                placeholder="Mô tả ngắn gọn về API"
+                minHeight={180}
+              />
+            </Box>
+          </Box>
         </Stack>
       </Box>
     </Fade>
