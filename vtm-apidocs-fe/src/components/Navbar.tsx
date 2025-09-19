@@ -18,7 +18,7 @@ import { AccountCircle, Description } from "@mui/icons-material";
 import { Menu as LucideMenu, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { colors } from "../theme/colors";
-import { listDocuments } from "../services/adminDocsService";
+import { listPublishedDocuments } from "../services/adminDocsService";
 
 interface ApiDocumentSummary {
   id: number;
@@ -45,6 +45,7 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
   const [docsError, setDocsError] = useState<string | null>(null);
 
   const isLoggedIn = !!user;
+  const isAdmin = (user?.role || "").toString().toLowerCase().includes("admin");
 
   const handleLogout = async () => {
     try {
@@ -72,7 +73,7 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
     try {
       setDocsLoading(true);
       setDocsError(null);
-      const data = await listDocuments();
+      const data = await listPublishedDocuments();
       setDocs(data || []);
     } catch (e: any) {
       setDocsError(e?.message || "Failed to load documents");
@@ -269,6 +270,25 @@ const Navbar: React.FC<NavbarProps> = ({ sidebarOpen, setSidebarOpen }) => {
                   </Box>
 
                   <Divider sx={{ my: 1 }} />
+
+                  {isAdmin ? (
+                    <>
+                      <MenuItem
+                        onClick={handleClose}
+                        component={Link}
+                        to="/dashboard"
+                      >
+                        Dashboard
+                      </MenuItem>
+                      <MenuItem
+                        onClick={handleClose}
+                        component={Link}
+                        to="/admin/accounts"
+                      >
+                        Accounts
+                      </MenuItem>
+                    </>
+                  ) : null}
 
                   <MenuItem
                     onClick={handleLogout}

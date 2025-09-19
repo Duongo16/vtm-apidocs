@@ -22,6 +22,16 @@ export async function listDocuments(q?: string, status?: DocStatus) {
   return data;
 }
 
+export async function listPublishedDocuments(q?: string, status?: DocStatus) {
+  const { data } = await apiDocsServiceApi.get<ApiDocumentSummary[]>(
+    "/admin/docs/published",
+    {
+      params: { q, status },
+    }
+  );
+  return data;
+}
+
 export async function getSpec(id: number) {
   const { data } = await apiDocsServiceApi.get<string>(
     `/admin/docs/${id}/spec`,
@@ -60,7 +70,10 @@ export async function updateMeta(
   id: number,
   payload: { name: string; slug: string; version: string; description: string }
 ) {
-  const { data } = await apiDocsServiceApi.put(`/admin/docs/${id}/meta`, payload);
+  const { data } = await apiDocsServiceApi.put(
+    `/admin/docs/${id}/meta`,
+    payload
+  );
   return data;
 }
 
@@ -122,12 +135,21 @@ export async function importSpec(payload: {
   return data;
 }
 
-export async function importDoc(file: File, meta: {name:string; slug:string; version:string; description?:string}) {
+export async function importDoc(
+  file: File,
+  meta: { name: string; slug: string; version: string; description?: string }
+) {
   const form = new FormData();
-  Object.entries(meta).forEach(([k,v]) => form.append(k, v ?? ""));
+  Object.entries(meta).forEach(([k, v]) => form.append(k, v ?? ""));
   form.append("file", file);
-  const res = await fetch(`/admin/docs/import-doc`, { method: "POST", body: form });
+  const res = await fetch(`/admin/docs/import-doc`, {
+    method: "POST",
+    body: form,
+  });
   if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ documentId: number; specText: string; status: string }>;
+  return res.json() as Promise<{
+    documentId: number;
+    specText: string;
+    status: string;
+  }>;
 }
-

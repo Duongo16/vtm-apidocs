@@ -5,6 +5,7 @@ import Register from "./pages/auth/Register";
 import Login from "./pages/auth/Login";
 import Docs from "./pages/Docs";
 import DocsDashboard from "./pages/DocsDashboard";
+import AdminAccounts from "./pages/AdminAccounts";
 
 function AppRoutes() {
   const { loading } = useAuth();
@@ -28,6 +29,7 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/docs/:categoryId?" element={<Docs />} />
       <Route path="/dashboard" element={<DocsDashboard />} />
+      <Route path="/admin/accounts" element={<AdminAccounts />} />
       <Route path="/" element={<Navigate to="/docs" replace />} />
     </Routes>
   );

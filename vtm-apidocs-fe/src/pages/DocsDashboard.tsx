@@ -156,6 +156,7 @@ export default function DocsDashboard() {
   // Sidebar state
   // =====================
   const [docs, setDocs] = useState<ApiDocumentSummary[]>([]);
+  const [allDocs, setAllDocs] = useState<ApiDocumentSummary[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DocStatus | "all">("all");
   const [loadingList, setLoadingList] = useState(false);
@@ -233,6 +234,27 @@ export default function DocsDashboard() {
     []
   );
 
+  const filteredDocs = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return allDocs.filter((doc) => {
+      const matchesStatus =
+        statusFilter === "all" || doc.status === statusFilter;
+      const matchesQuery =
+        !q ||
+        [doc.name, doc.slug, doc.version]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(q));
+      return matchesStatus && matchesQuery;
+    });
+  }, [allDocs, query, statusFilter]);
+  useEffect(() => {
+    setDocs(filteredDocs);
+    setActiveId((prev) => {
+      if (!filteredDocs.length) return null;
+      if (prev && filteredDocs.some((d) => d.id === prev)) return prev;
+      return filteredDocs[0].id;
+    });
+  }, [filteredDocs]);
   const activeDocUpdatedAt = useMemo(
     () => (activeDoc?.updatedAt ? formatDateTime(activeDoc.updatedAt) : ""),
     [activeDoc?.updatedAt]
@@ -289,7 +311,7 @@ export default function DocsDashboard() {
         const sorted = [...list].sort((a, b) =>
           (b.updatedAt || "").localeCompare(a.updatedAt || "")
         );
-        setDocs(sorted);
+        setAllDocs(sorted);
 
         // Tính nextActiveId theo quy tắc đã mô tả:
         const selectId = selectParam ? Number(selectParam) : null;
@@ -315,7 +337,7 @@ export default function DocsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [query, statusFilter, selectParam, refreshTick]); // thêm selectParam để bắt thay đổi URL/param
+  }, [selectParam, refreshTick]); // thêm selectParam để bắt thay đổi URL/param
 
   // 2) Load spec khi activeId thay đổi (chỉ phụ thuộc activeId)
   useEffect(() => {
@@ -742,6 +764,11 @@ export default function DocsDashboard() {
           }}
         >
           <Toolbar
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setRefreshTick((t) => t + 1);
+            }}
             sx={{
               gap: 1,
               borderBottom: "1px solid var(--vtm-toolbar-border)",
@@ -1284,19 +1311,21 @@ export default function DocsDashboard() {
               }
             />
           </Stack>
-          <Autocomplete
-            size="small"
-            options={categories}
-            getOptionLabel={(o) => o.name}
-            value={
-              categories.find((c) => c.id === importForm.categoryId) ?? null
-            }
-            onChange={(_, opt) =>
-              setImportForm((f) => ({ ...f, categoryId: opt?.id ?? null }))
-            }
-            renderInput={(p) => <TextField {...p} label="Category" />}
-          />
+
           <Stack direction="row" spacing={2}>
+            <Autocomplete
+              size="small"
+              fullWidth
+              options={categories}
+              getOptionLabel={(o) => o.name}
+              value={
+                categories.find((c) => c.id === importForm.categoryId) ?? null
+              }
+              onChange={(_, opt) =>
+                setImportForm((f) => ({ ...f, categoryId: opt?.id ?? null }))
+              }
+              renderInput={(p) => <TextField {...p} label="Category" />}
+            />
             <TextField
               select
               label="LLM Provider"

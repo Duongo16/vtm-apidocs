@@ -19,4 +19,11 @@ public interface DocumentRepository extends JpaRepository<ApiDocument, Long> {
            from ApiDocument d
            """)
     List<ApiDocument> search(@Param("q") String q, @Param("status") ApiDocument.Status status);
+
+    @Query("""
+           select d
+           from ApiDocument d
+           where d.status = "published"
+           """)
+    List<ApiDocument> searchPublished(@Param("q") String q, @Param("status") ApiDocument.Status status);
 }

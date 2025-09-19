@@ -106,6 +106,13 @@ public class SpecController {
         return documentService.listDocuments(q, status);
     }
 
+    @GetMapping("/published")
+    public List<ApiDocument> listPublishedDocuments(@RequestParam(required = false) String q,
+                                           @RequestParam(required = false, defaultValue = "all") String status) {
+        System.out.println("check");
+        return documentService.listPublishedDocuments(q, status);
+    }
+
     /** Lấy chi tiết 1 document (bao gồm meta cơ bản). */
     @GetMapping("/{id}")
     public ApiDocument getDocument(@PathVariable Long id) {

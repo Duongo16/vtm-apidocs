@@ -139,6 +139,24 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public List<ApiDocument> listPublishedDocuments(String q, String status) {
+        String qq = (q == null || q.isBlank()) ? null : q.toLowerCase().trim();
+
+        ApiDocument.Status st = null;
+        if (status != null && !status.isBlank() && !"all".equalsIgnoreCase(status)) {
+            try {
+                // enum lowercase
+                st = ApiDocument.Status.valueOf(status.toLowerCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid status filter: " + status
+                        + ". Allowed: draft, published, archived, or 'all'.");
+            }
+        }
+
+        return docRepo.searchPublished(qq, st);
+    }
+
+    @Override
     @Transactional
     public ApiDocument updateMeta(Long id, String name, String slug, String version, String description) {
         ApiDocument doc = docRepo.findById(id).orElseThrow();
