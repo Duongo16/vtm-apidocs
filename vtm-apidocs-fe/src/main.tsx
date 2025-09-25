@@ -6,7 +6,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import App from "./App";
 import { ToastProvider } from "./context/ToastContext";
 import { colors } from "./theme/colors";
-import "./index.css"   
+import "./index.css";
 
 const theme = createTheme({
   palette: {
